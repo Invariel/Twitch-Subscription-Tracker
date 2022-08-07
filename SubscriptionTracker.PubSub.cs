@@ -10,6 +10,8 @@ namespace Subscription_Tracker
 {
     public partial class SubscriptionTracker : Form
     {
+        private string channelId;
+
         public async void Connect(object? sender, EventArgs e)
         {
             if (!_connected)
@@ -17,8 +19,6 @@ namespace Subscription_Tracker
                 _twitchAPI = new TwitchLib.Api.TwitchAPI();
                 _twitchAPI.Settings.ClientId = ClientId;
                 _twitchAPI.Settings.AccessToken = _settings.AccessToken;
-
-                string channelId;
 
                 try
                 {
@@ -49,31 +49,37 @@ namespace Subscription_Tracker
                     return;
                 }
 
-                _pubSub = new TwitchLib.PubSub.TwitchPubSub();
-
-                _pubSub.OnPubSubServiceConnected += delegate
-                {
-                    _pubSub.ListenToSubscriptions(channelId);
-
-                    this.Invoke((Action)(() => lbl_Connected.Text = $"Connected for {_settings.ChannelName}"));
-                };
-
-                _pubSub.OnPubSubServiceClosed += delegate
-                {
-                    _pubSub.Connect();
-                    this.Invoke((Action)(() => lbl_Connected.Text = $"Disconnected."));
-                };
-
-                _pubSub.OnPubSubServiceError += delegate
-                {
-                    _pubSub.Connect();
-                    this.Invoke((Action)(() => lbl_Connected.Text = $"Disconnected."));
-                };
-
-                _pubSub.OnChannelSubscription += AddSubPoints;
-
-                _pubSub.Connect();
+                StartPubSub();
             }
+        }
+
+        public void StartPubSub ()
+        {
+            _pubSub = new TwitchLib.PubSub.TwitchPubSub();
+
+            _pubSub.OnPubSubServiceConnected += delegate
+            {
+                _pubSub.ListenToSubscriptions(channelId);
+                _pubSub.SendTopics(_settings.AccessToken);
+
+                this.Invoke((Action)(() => lbl_Connected.Text = $"Connected for {_settings.ChannelName}"));
+            };
+
+            _pubSub.OnPubSubServiceClosed += delegate
+            {
+                StartPubSub();
+                this.Invoke((Action)(() => lbl_Connected.Text = $"Disconnected."));
+            };
+
+            _pubSub.OnPubSubServiceError += delegate
+            {
+                StartPubSub();
+                this.Invoke((Action)(() => lbl_Connected.Text = $"Disconnected."));
+            };
+
+            _pubSub.OnChannelSubscription += AddSubPoints;
+
+            _pubSub.Connect();
         }
 
         public async void AddSubPoints(object? sender, OnChannelSubscriptionArgs args)
